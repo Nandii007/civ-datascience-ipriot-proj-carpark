@@ -22,10 +22,10 @@ import unittest
 # Make the smartpark package importable from the tests folder
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from carpark_manager import CarparkManager
+from smartpark.carpark_manager import CarparkManager
 
 # Path to config used by all tests
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config.json")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "smartpark", "config.json")
 
 
 class TestCarparkManagerInitialState(unittest.TestCase):

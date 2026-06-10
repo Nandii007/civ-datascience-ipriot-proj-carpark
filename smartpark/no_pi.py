@@ -19,8 +19,6 @@ from typing import Iterable
 
 from interfaces import CarparkSensorListener, CarparkDataProvider
 from carpark_manager import CarparkManager
-
-
 # ---------------------------------------------------------------------------
 # WindowedDisplay — provided infrastructure, do not modify
 # ---------------------------------------------------------------------------

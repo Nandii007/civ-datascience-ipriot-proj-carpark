@@ -47,5 +47,7 @@ def parse_config(config_file: str) -> dict:
 
 
 if __name__ == "__main__":
-    cfg = parse_config("config.json")
+    import os
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    cfg = parse_config(config_path)
     print(cfg)
