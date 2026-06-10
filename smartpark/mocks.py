@@ -1,9 +1,14 @@
 
 import time
 
-from interfaces import CarparkSensorListener
-from interfaces import CarparkDataProvider
-from config_parser import parse_config
+
+
+try:
+    from smartpark.interfaces import CarparkSensorListener, CarparkDataProvider
+    from smartpark.config_parser import parse_config
+except ModuleNotFoundError:
+    from interfaces import CarparkSensorListener, CarparkDataProvider
+    from config_parser import parse_config
 '''
     TODO: 
     - make your own module, or rename this one. Yours won't be a mock-up, so "mocks" is a bad name here.

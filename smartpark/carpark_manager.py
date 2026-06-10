@@ -13,9 +13,16 @@ from pathlib import Path
 
 
 
-from interfaces import CarparkSensorListener, CarparkDataProvider
-from car import Car
-from config_parser import parse_config
+
+
+try:
+    from smartpark.interfaces import CarparkSensorListener, CarparkDataProvider
+    from smartpark.car import Car
+    from smartpark.config_parser import parse_config
+except ModuleNotFoundError:
+    from interfaces import CarparkSensorListener, CarparkDataProvider
+    from car import Car
+    from config_parser import parse_config
 
 # Configure module-level logger
 logger = logging.getLogger(__name__)
