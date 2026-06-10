@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from smartpark.carpark_manager import CarparkManager
 
 # Path to config used by all tests
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "smartpark", "config.json")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "smartpark", "config.json")
 
 
 class TestCarparkManagerInitialState(unittest.TestCase):

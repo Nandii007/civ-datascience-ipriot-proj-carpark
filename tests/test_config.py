@@ -10,12 +10,12 @@ import os
 from pathlib import Path
  
 # Add smartpark folder to path so we can import from it
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "smartpark"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
  
-from config_parser import parse_config
+from smartpark.config_parser import parse_config
  
 # Path to the real config.json inside smartpark/
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "smartpark", "config.json")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "smartpark", "config.json")
  
  
 class TestConfigParsing(unittest.TestCase):

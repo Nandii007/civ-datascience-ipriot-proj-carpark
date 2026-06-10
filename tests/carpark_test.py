@@ -1,12 +1,11 @@
 import unittest
 import sys,os
 from pathlib import Path
-cwd = Path(os.path.dirname(__file__))
-parent = str(cwd.parent)
 
-sys.path.append(parent + "/smartpark")
 
-#Change the line below to import your manager class
+#Add project root to path so smartpark package can be found
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from smartpark.mocks import MockCarparkManager
 
 class TestConfigParsing(unittest.TestCase):
