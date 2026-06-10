@@ -1,38 +1,50 @@
-"""The following code is used to provide an alternative to students who do not have a Raspberry Pi.
-If you have a Raspberry Pi, or a SenseHAT emulator under Debian, you do not need to use this code.
+"""
+no_pi.py - Tkinter UI for the SmartPark application.
 
-You need to split the classes here into two files, one for the CarParkDisplay and one for the CarDetector.
-Attend to the TODOs in each class to complete the implementation."""
-from interfaces import CarparkSensorListener
-from interfaces import CarparkDataProvider
+Provides a simulated car detector window and a display window for students
+who do not have a Raspberry Pi / SenseHAT.
+
+Run this file directly to start the application::
+
+    python no_pi.py
+
+Part of the SmartPark IoT Carpark Application.
+"""
+
+import os
 import threading
 import time
 import tkinter as tk
 from typing import Iterable
-#TODO: replace this module with yours
-import mocks
 
-# ------------------------------------------------------------------------------------#
-# You don't need to understand how to implement this class.                           #
-# ------------------------------------------------------------------------------------#
+from interfaces import CarparkSensorListener, CarparkDataProvider
+from carpark_manager import CarparkManager
 
+
+# ---------------------------------------------------------------------------
+# WindowedDisplay — provided infrastructure, do not modify
+# ---------------------------------------------------------------------------
 
 class WindowedDisplay:
-    """Displays values for a given set of fields as a simple GUI window. Use .show() to display the window; use .update() to update the values displayed.
+    """Displays values for a given set of fields as a simple GUI window.
+
+    Use .show() to display the window and .update() to refresh values.
     """
 
     DISPLAY_INIT = '– – –'
-    SEP = ':'  # field name separator
+    SEP = ':'
 
     def __init__(self, root, title: str, display_fields: Iterable[str]):
-        """Creates a Windowed (tkinter) display to replace sense_hat display. To show the display (blocking) call .show() on the returned object.
+        """Initialise the windowed display.
 
         Parameters
         ----------
+        root :
+            The parent tkinter root window.
         title : str
-            The title of the window (usually the name of your carpark from the config)
-        display_fields : Iterable
-            An iterable (usually a list) of field names for the UI. Updates to values must be presented in a dictionary with these values as keys.
+            Window title (usually the carpark name from config).
+        display_fields : Iterable[str]
+            Labels for each row of the display.
         """
         self.window = tk.Toplevel(root)
         self.window.title(f'{title}: Parking')
@@ -42,146 +54,206 @@ class WindowedDisplay:
 
         self.gui_elements = {}
         for i, field in enumerate(self.display_fields):
-
-            # create the elements
             self.gui_elements[f'lbl_field_{i}'] = tk.Label(
-                self.window, text=field+self.SEP, font=('Arial', 50))
+                self.window, text=field + self.SEP, font=('Arial', 50))
             self.gui_elements[f'lbl_value_{i}'] = tk.Label(
                 self.window, text=self.DISPLAY_INIT, font=('Arial', 50))
 
-            # position the elements
             self.gui_elements[f'lbl_field_{i}'].grid(
                 row=i, column=0, sticky=tk.E, padx=5, pady=5)
             self.gui_elements[f'lbl_value_{i}'].grid(
                 row=i, column=2, sticky=tk.W, padx=10)
 
-    def show(self):
-        """Display the GUI. Blocking call."""
-#        self.window.mainloop()
+    def show(self) -> None:
+        """Display the GUI (non-blocking)."""
 
-    def update(self, updated_values: dict):
-        """Update the values displayed in the GUI. Expects a dictionary with keys matching the field names passed to the constructor."""
+    def update(self, updated_values: dict) -> None:
+        """Update the displayed values.
+
+        Parameters
+        ----------
+        updated_values : dict
+            Keys must match the field names passed to the constructor.
+        """
         for field in self.gui_elements:
             if field.startswith('lbl_field'):
                 field_value = field.replace('field', 'value')
                 self.gui_elements[field_value].configure(
-                    text=updated_values[self.gui_elements[field].cget('text').rstrip(self.SEP)])
+                    text=updated_values[
+                        self.gui_elements[field].cget('text').rstrip(self.SEP)
+                    ]
+                )
         self.window.update()
 
-# -----------------------------------------#
-# TODO: STUDENT IMPLEMENTATION STARTS HERE #
-# -----------------------------------------#
+
+# ---------------------------------------------------------------------------
+# CarParkDisplay — student implementation
+# ---------------------------------------------------------------------------
 
 class CarParkDisplay:
-    """Provides a simple display of the car park status. This is a skeleton only. The class is designed to be customizable without requiring and understanding of tkinter or threading."""
-    # determines what fields appear in the UI
+    """Shows live carpark data (available bays, temperature, time) in a window.
+
+    Reads from a CarparkDataProvider and refreshes the display every second
+    via a background thread.
+    """
+
     fields = ['Available bays', 'Temperature', 'At']
 
-    def __init__(self,root):
-        self.window = WindowedDisplay(root,
-            'Moondalup', CarParkDisplay.fields)
-        updater = threading.Thread(target=self.check_updates)
-        updater.daemon = True
+    def __init__(self, root, title: str = 'Moondalup'):
+        """Initialise the display window and start the background updater.
+
+        Parameters
+        ----------
+        root :
+            Parent tkinter root window.
+        title : str
+            Title shown in the window bar.
+        """
+        self.window = WindowedDisplay(root, title, CarParkDisplay.fields)
+        self._provider = None
+
+        updater = threading.Thread(target=self._check_updates, daemon=True)
         updater.start()
         self.window.show()
-        self._provider=None
-    
+
     @property
     def data_provider(self):
+        """The CarparkDataProvider supplying display data."""
         return self._provider
-    @data_provider.setter
-    def data_provider(self,provider):
-        if isinstance(provider,CarparkDataProvider):
-            self._provider=provider
 
-    def update_display(self):
+    @data_provider.setter
+    def data_provider(self, provider):
+        """Set the data provider if it implements CarparkDataProvider."""
+        if isinstance(provider, CarparkDataProvider):
+            self._provider = provider
+
+    def _update_display(self) -> None:
+        """Push the latest values from the provider into the window."""
+        spaces = self._provider.available_spaces
+        # Show FULL in red text when no spaces remain
+        bay_label = f'{spaces:03d}' if spaces > 0 else 'FULL'
         field_values = dict(zip(CarParkDisplay.fields, [
-            f'{self._provider.available_spaces:03d}',
-            f'{self._provider.temperature:02d}℃',
-            time.strftime("%H:%M:%S",self._provider.current_time)
+            bay_label,
+            f'{self._provider.temperature:.1f}\u2103',
+            time.strftime("%H:%M:%S", self._provider.current_time),
         ]))
         self.window.update(field_values)
 
-    def check_updates(self):
+    def _check_updates(self) -> None:
+        """Background thread: refresh the display once per second."""
         while True:
-            # TODO: This timer is pretty janky! Can you provide some kind of signal from your code
-            # to update the display?
             time.sleep(1)
-            # When you get an update, refresh the display.
             if self._provider is not None:
-                self.update_display()
+                self._update_display()
 
+
+# ---------------------------------------------------------------------------
+# CarDetectorWindow — student implementation
+# ---------------------------------------------------------------------------
 
 class CarDetectorWindow:
-    """Provides a couple of simple buttons that can be used to represent a sensor detecting a car. This is a skeleton only."""
+    """Tkinter window that simulates car-entry and car-exit sensor events."""
 
-    def __init__(self,root):
-        self.root=root
+    def __init__(self, root):
+        """Initialise the detector window with buttons and input fields.
+
+        Parameters
+        ----------
+        root :
+            Parent tkinter root window.
+        """
+        self.root = root
         self.root.title("Car Detector ULTRA")
+        self.listeners = []
 
+        # Car entry button
         self.btn_incoming_car = tk.Button(
-            self.root, text='🚘 Incoming Car', font=('Arial', 50), cursor='right_side', command=self.incoming_car)
-        self.btn_incoming_car.grid(padx=10, pady=5,row=0,columnspan=2)
-        self.btn_outgoing_car = tk.Button(
-            self.root, text='Outgoing Car 🚘',  font=('Arial', 50), cursor='bottom_left_corner', command=self.outgoing_car)
-        self.btn_outgoing_car.grid(padx=10, pady=5,row=1,columnspan=2)
-        self.listeners=list()
-        self.temp_label=tk.Label(
-            self.root, text="Temperature", font=('Arial', 20)
+            self.root, text='\U0001f698 Incoming Car',
+            font=('Arial', 50), cursor='right_side',
+            command=self._incoming_car,
         )
-        self.temp_label.grid(padx=10, pady=5,column=0,row=2)
-        self.temp_var=tk.StringVar()
-        self.temp_var.trace_add("write",lambda x,y,v: self.temperature_changed(float(self.temp_var.get())))
-        self.temp_box=tk.Entry(
-            self.root,font=('Arial', 20),textvariable=self.temp_var
-        )
-        self.temp_box.grid(padx=10, pady=5,column=1,row=2)
+        self.btn_incoming_car.grid(padx=10, pady=5, row=0, columnspan=2)
 
-        self.plate_label=tk.Label(
-            self.root, text="License Plate", font=('Arial', 20)
+        # Car exit button
+        self.btn_outgoing_car = tk.Button(
+            self.root, text='Outgoing Car \U0001f698',
+            font=('Arial', 50), cursor='bottom_left_corner',
+            command=self._outgoing_car,
         )
-        self.plate_label.grid(padx=10, pady=5,column=0,row=3)
-        self.plate_var=tk.StringVar()
-        self.plate_box=tk.Entry(
-            self.root,font=('Arial', 20),textvariable=self.plate_var
-        )
-        self.plate_box.grid(padx=10, pady=5,column=1,row=3)
-    
+        self.btn_outgoing_car.grid(padx=10, pady=5, row=1, columnspan=2)
+
+        # Temperature input
+        tk.Label(self.root, text="Temperature",
+                 font=('Arial', 20)).grid(padx=10, pady=5, column=0, row=2)
+        self.temp_var = tk.StringVar()
+        self.temp_var.trace_add(
+            "write", lambda x, y, v: self._temperature_changed())
+        tk.Entry(self.root, font=('Arial', 20),
+                 textvariable=self.temp_var).grid(
+            padx=10, pady=5, column=1, row=2)
+
+        # License plate input
+        tk.Label(self.root, text="License Plate",
+                 font=('Arial', 20)).grid(padx=10, pady=5, column=0, row=3)
+        self.plate_var = tk.StringVar()
+        tk.Entry(self.root, font=('Arial', 20),
+                 textvariable=self.plate_var).grid(
+            padx=10, pady=5, column=1, row=3)
+
     @property
-    def current_license(self):
+    def current_license(self) -> str:
+        """Return the license plate currently typed in the input field."""
         return self.plate_var.get()
 
-    def add_listener(self,listener):
-        if isinstance(listener,CarparkSensorListener):
+    def add_listener(self, listener) -> None:
+        """Register an object to receive sensor event callbacks.
+
+        Parameters
+        ----------
+        listener : CarparkSensorListener
+            Object with incoming_car, outgoing_car, temperature_reading methods.
+        """
+        if isinstance(listener, CarparkSensorListener):
             self.listeners.append(listener)
 
-    def incoming_car(self):
-#        print("Car goes in")
+    def _incoming_car(self) -> None:
+        """Fire the incoming_car event on all registered listeners."""
         for listener in self.listeners:
             listener.incoming_car(self.current_license)
 
-    def outgoing_car(self):
-#        print("Car goes out")
+    def _outgoing_car(self) -> None:
+        """Fire the outgoing_car event on all registered listeners."""
         for listener in self.listeners:
             listener.outgoing_car(self.current_license)
 
-    def temperature_changed(self,temp):
+    def _temperature_changed(self) -> None:
+        """Fire the temperature_reading event when the input field changes."""
+        try:
+            temp = float(self.temp_var.get())
+        except ValueError:
+            return
         for listener in self.listeners:
             listener.temperature_reading(temp)
 
 
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
 if __name__ == '__main__':
     root = tk.Tk()
 
-    #TODO: This is my dodgy mockup. Replace it with a good one!
-    mock=mocks.MockCarparkManager()
+    # Load real CarparkManager from config
+    manager = CarparkManager(
+        config_file=os.path.join(os.path.dirname(__file__), "config.json")
+    )
 
-    display=CarParkDisplay(root)
-    #TODO: Set the display to use your data source
-    display.data_provider=mock
+    # Set up the display and wire it to the manager
+    display = CarParkDisplay(root, title=manager.location.title())
+    display.data_provider = manager
 
-    detector=CarDetectorWindow(root)
-    #TODO: Attach your event listener
-    detector.add_listener(mock)
+    # Set up the detector and wire it to the manager
+    detector = CarDetectorWindow(root)
+    detector.add_listener(manager)
 
     root.mainloop()
