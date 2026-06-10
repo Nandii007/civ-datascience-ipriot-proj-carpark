@@ -1,47 +1,51 @@
-"""A class or function to parse the config file and return the values as a dictionary.
+"""
+config_parser.py - Reads and parses the carpark JSON configuration file.
 
-The config file itself can be any of the following formats (recommend one of pandas, json, or ryo):
-
-- You can use pandas to read a data file if you like. Something simple like a CSV would be best.
-
-- ryo: means 'roll your own' and is a simple text file with key-value pairs separated by an equals sign. For example:
-```
-location = "Moondalup City Square Parking"
-number_of_spaces = 192
-```
-**you** read the file and parse it into a dictionary.
-- json: a json file with key-value pairs. For example:
-```json
-{location: "Moondalup City Square Parking", number_of_spaces: 192}
-```
-json is built in to python, so you can use the json module to parse it into a dictionary.
-- toml: a toml file with key-value pairs. For example:
-```toml
-[location]
-name = "Moondalup City Square Parking"
-spaces = 192
-```
-toml is part of the standard library in python 3.11, otherwise you need to install tomli to parse it into a dictionary.
-```bash
-python -m pip install tomli
-```
-see [realpython.com](https://realpython.com/python-toml/) for more info.
-
-Finally, you can use `yaml` if you prefer.
-
-
-
+Part of the SmartPark IoT Carpark Application.
 """
 
+import json
 
 
 def parse_config(config_file: str) -> dict:
-    """Parse the config file and return the values as a dictionary"""
-    import json
-    with open(config_file) as input_file:
-        config = json.load(input_file)
-    return config["CarParks"][0]
+    """Parse a JSON configuration file and return the first carpark's settings.
 
-if __name__ == '__main__':
-    cfg_data=parse_config("samples_and_snippets\\config.json")
-    print(cfg_data)
+    The expected format is::
+
+        {
+            "CarParks": [
+                {
+                    "name": "...",
+                    "total-spaces": 130,
+                    "total-cars": 0,
+                    "location": "...",
+                    ...
+                }
+            ]
+        }
+
+    Parameters
+    ----------
+    config_file : str
+        Path to the JSON configuration file.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the configuration for the first carpark entry.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the configuration file does not exist at the given path.
+    KeyError
+        If the JSON structure does not contain a "CarParks" key.
+    """
+    with open(config_file, "r", encoding="utf-8") as input_file:
+        data = json.load(input_file)
+    return data["CarParks"][0]
+
+
+if __name__ == "__main__":
+    cfg = parse_config("config.json")
+    print(cfg)
