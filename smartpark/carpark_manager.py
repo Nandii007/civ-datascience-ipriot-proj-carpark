@@ -6,15 +6,16 @@ and CarparkDataProvider (exposes data for the display).
 
 Part of the SmartPark IoT Carpark Application.
 """
-
+import os
 import time
 import logging
 from pathlib import Path
 
+
+
 from interfaces import CarparkSensorListener, CarparkDataProvider
 from car import Car
 from config_parser import parse_config
-
 
 # Configure module-level logger
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ class CarparkManager(CarparkSensorListener, CarparkDataProvider):
 
     DEFAULT_LOG_FILE = Path("carpark_log.txt")
 
-    def __init__(self, config_file: str = "config.json"):
+    def __init__(self, config_file: str = None):
         """Initialise the CarparkManager from a configuration file.
 
         Parameters
@@ -52,22 +53,26 @@ class CarparkManager(CarparkSensorListener, CarparkDataProvider):
         config_file : str
             Path to the JSON configuration file.
         """
+        if config_file is None:
+            config_file = os.path.join(
+                os.path.dirname(__file__), "..", "config.json"
+            )
+
         config = parse_config(config_file)
 
-        self.location: str = config.get("location", "Unknown")
-        self.total_spaces: int = int(config.get("total-spaces", 0))
-        self._available_spaces: int = self.total_spaces
-        self._temperature: float = 0.0
-        self._parked_cars: dict = {}
+        self.location = config.get("location", "Unknown")
+        self.total_spaces = int(config.get("total-spaces", 0))
+        self._available_spaces = self.total_spaces
+        self._temperature = 0.0
+        self._parked_cars = {}
 
         self._log_file = self.DEFAULT_LOG_FILE
         self._setup_logging()
 
         self._log_event(
-            f"CarparkManager initialised — location: {self.location}, "
+            f"CarparkManager initialised - location: {self.location}, "
             f"total spaces: {self.total_spaces}"
         )
-
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
